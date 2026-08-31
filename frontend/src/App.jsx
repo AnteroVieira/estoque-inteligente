@@ -25,7 +25,7 @@ ChartJS.register(
   Legend
 );
 
-const API_URL = "https://estoque-inteligente-xmd0.onrender.com/api/predict";
+const API_URL = "https://estoque-inteligente-xmd0.onrender.com/api/products";
 
 export default function App() {
   const [predictions, setPredictions] = useState([]);
