@@ -12,7 +12,7 @@ export default function App() {
 
   useEffect(() => {
     // Busca os dados do backend
-    axios.get('http://localhost:3001/api/predictions')
+    axios.get("https://estoque-inteligente-xmd0.onrender.com/api/predict")
       .then(res => {
         setPredictions(res.data);
         setLoading(false);
