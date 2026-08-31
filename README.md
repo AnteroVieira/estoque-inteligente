@@ -2,9 +2,13 @@
 
 > Sistema full-stack para gestão preditiva de estoque com cálculo de autonomia em tempo real, visualização em gráficos e alertas automáticos de reposição.
 
-🚀 **[CLIQUE AQUI PARA ACESSAR A APLICAÇÃO EM TEMPO REAL](https://anterovieira.github.io/estoque-inteligente/)**
+## 🚀 Acesse a Aplicação
 
----
+O painel interativo está publicado e disponível para uso no link abaixo:
+
+🔗 **[Clique aqui para acessar o Controle Preditivo de Estoque](https://estoque-inteligente-xmd0.onrender.com)**
+
+
 
 ## 🎯 Sobre o Projeto
 
