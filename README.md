@@ -6,7 +6,7 @@
 
 O painel interativo está publicado e disponível para uso no link abaixo:
 
-🔗 **[Clique aqui para acessar o Controle Preditivo de Estoque](https://estoque-inteligente-xmd0.onrender.com)**
+🔗 [Clique aqui para acessar o Controle Preditivo de Estoque](https://anterovieira.github.io/estoque-inteligente/)
 
 
 
