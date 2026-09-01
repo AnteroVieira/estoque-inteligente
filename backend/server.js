@@ -74,13 +74,13 @@ app.post('/api/movements', async (req, res) => {
   res.json({ message: 'Movimentação registrada com sucesso.' });
 });
 
-// Rota 4: Algoritmo de Previsão de Falta de Estoque (Inteligência Preditiva)
+// Rota 4: Algoritmo de Previsão de Falta de Estoque (Ajustado para novos produtos)
 app.get('/api/predictions', async (req, res) => {
   const products = await db.all('SELECT * FROM products');
   const predictions = [];
 
   for (const product of products) {
-    // Busca total de saídas dos últimos 30 dias
+    // Busca total de saídas dos últimos 30 dias na tabela de movimentações
     const result = await db.get(
       `SELECT SUM(quantity) as total_out 
        FROM stock_movements 
@@ -90,8 +90,13 @@ app.get('/api/predictions', async (req, res) => {
     );
 
     const totalOut = result?.total_out || 0;
-    const dailyConsumption = totalOut / 30 || 0.1; // Média diária de consumo
+    const calculatedDaily = totalOut / 30;
+
+    // Se houver vendas gravadas, usa o histórico. Se for produto novo, usa a estimativa (min_stock / 7)
+    const dailyConsumption = calculatedDaily > 0 ? calculatedDaily : (product.min_stock / 7 || 1);
+    
     const daysRemaining = Math.floor(product.current_stock / dailyConsumption);
+    const isCritical = daysRemaining <= product.lead_time_days;
 
     predictions.push({
       productId: product.id,
@@ -99,8 +104,8 @@ app.get('/api/predictions', async (req, res) => {
       currentStock: product.current_stock,
       dailyConsumption: dailyConsumption.toFixed(2),
       daysRemaining,
-      status: daysRemaining <= product.lead_time_days ? 'CRÍTICO' : 'OK',
-      suggestedReorderQuantity: daysRemaining <= product.lead_time_days ? Math.ceil(dailyConsumption * 30) : 0
+      status: isCritical ? 'CRÍTICO' : 'OK',
+      suggestedReorderQuantity: isCritical ? Math.ceil(dailyConsumption * 30) : 0
     });
   }
 
