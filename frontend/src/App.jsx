@@ -24,7 +24,7 @@ ChartJS.register(
   Legend
 );
 
-const API_PRODUCTS = "https://estoque-inteligente-xmd0.onrender.com/api/products";
+const API_BASE = "https://estoque-inteligente-xmd0.onrender.com/api";
 
 export default function App() {
   const [predictions, setPredictions] = useState([]);
@@ -32,11 +32,12 @@ export default function App() {
 
   const [name, setName] = useState('');
   const [currentStock, setCurrentStock] = useState('');
-  const [dailyConsumption, setDailyConsumption] = useState('');
+  const [minStock, setMinStock] = useState('5'); // Valor padrão para min_stock
 
   const fetchPredictions = async () => {
     try {
-      const res = await axios.get(API_PRODUCTS);
+      // Tenta buscar as previsões prontas da API
+      const res = await axios.get(`${API_BASE}/predictions`).catch(() => axios.get(`${API_BASE}/products`));
       if (Array.isArray(res.data)) {
         setPredictions(res.data);
       }
@@ -54,37 +55,38 @@ export default function App() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Payload formatado para a rota /api/products
+    // Payload correspondente ao schema do SQLite no server.js
     const payload = {
       name: name,
-      currentStock: Number(currentStock),
-      dailyConsumption: Number(dailyConsumption),
       current_stock: Number(currentStock),
-      daily_consumption: Number(dailyConsumption)
+      min_stock: Number(minStock) || 5,
+      lead_time_days: 7
     };
 
     try {
-      await axios.post(API_PRODUCTS, payload);
+      await axios.post(`${API_BASE}/products`, payload);
 
       setName('');
       setCurrentStock('');
-      setDailyConsumption('');
+      setMinStock('5');
       fetchPredictions();
+      alert("Produto cadastrado com sucesso!");
     } catch (error) {
-      console.error("Erro ao cadastrar produto:", error);
-      alert("Erro no servidor (Status 500). Verifique os logs do Render ou tente novamente.");
+      console.error("Erro no cadastro:", error);
+      alert("Erro ao cadastrar. Verifique o console com F12.");
     }
   };
 
   const chartData = {
-    labels: predictions.map((p) => p.name || `Prod ${p.id || ''}`),
+    labels: predictions.map((p) => p.name || `Prod ${p.productId || p.id || ''}`),
     datasets: [
       {
         label: 'Dias Restantes de Estoque',
-        data: predictions.map((p) => p.days_remaining ?? p.days_left ?? 0),
-        backgroundColor: predictions.map((p) => 
-          (p.days_remaining <= 5 || p.days_left <= 5) ? 'rgba(220, 38, 38, 0.8)' : 'rgba(37, 99, 235, 0.8)'
-        ),
+        data: predictions.map((p) => p.daysRemaining ?? p.days_remaining ?? 0),
+        backgroundColor: predictions.map((p) => {
+          const days = p.daysRemaining ?? p.days_remaining ?? 0;
+          return days <= 7 ? 'rgba(220, 38, 38, 0.8)' : 'rgba(37, 99, 235, 0.8)';
+        }),
       },
     ],
   };
@@ -96,16 +98,16 @@ export default function App() {
           📦 Controle Preditivo de Estoque
         </h1>
         <p style={{ color: '#64748b', marginTop: '4px', fontSize: '14px' }}>
-          Previsão de reposição inteligente baseada no consumo diário
+          Previsão de reposição inteligente baseada no histórico de saídas
         </p>
       </header>
 
       <main style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
         
-        {/* FORMULÁRIO */}
+        {/* CARD DO FORMULÁRIO */}
         <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0' }}>
           <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }}>
-            ➕ Cadastrar Produto & Calcular Autonomia
+            ➕ Cadastrar Produto no Estoque
           </h2>
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-end' }}>
             <div style={{ flex: '1', minWidth: '200px' }}>
@@ -117,7 +119,7 @@ export default function App() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                placeholder="Ex: Cadeira"
+                placeholder="Ex: Cadeira Gamer"
                 style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '14px', backgroundColor: '#f8fafc', boxSizing: 'border-box' }}
               />
             </div>
@@ -135,18 +137,17 @@ export default function App() {
                 style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '14px', backgroundColor: '#f8fafc', boxSizing: 'border-box' }}
               />
             </div>
-            <div style={{ width: '180px' }}>
+            <div style={{ width: '160px' }}>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#475569', marginBottom: '6px' }}>
-                Consumo Diário (un/dia)
+                Estoque Mínimo (un)
               </label>
               <input
                 type="number"
-                value={dailyConsumption}
-                onChange={(e) => setDailyConsumption(e.target.value)}
+                value={minStock}
+                onChange={(e) => setMinStock(e.target.value)}
                 required
-                min="0.1"
-                step="0.1"
-                placeholder="Ex: 10"
+                min="1"
+                placeholder="Ex: 5"
                 style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '14px', backgroundColor: '#f8fafc', boxSizing: 'border-box' }}
               />
             </div>
@@ -154,19 +155,19 @@ export default function App() {
               type="submit"
               style={{ backgroundColor: '#2563eb', color: '#ffffff', fontWeight: 'bold', padding: '10px 20px', borderRadius: '6px', border: 'none', cursor: 'pointer', height: '42px', fontSize: '14px' }}
             >
-              📈 Calcular & Cadastrar
+              📈 Cadastrar Produto
             </button>
           </form>
         </div>
 
-        {/* TABELA */}
+        {/* CARD DA TABELA */}
         <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0', overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
                 <th style={{ padding: '12px', color: '#475569', fontSize: '14px' }}>Produto</th>
                 <th style={{ padding: '12px', color: '#475569', fontSize: '14px' }}>Estoque Atual</th>
-                <th style={{ padding: '12px', color: '#475569', fontSize: '14px' }}>Média Diária</th>
+                <th style={{ padding: '12px', color: '#475569', fontSize: '14px' }}>Consumo Diário (Média)</th>
                 <th style={{ padding: '12px', color: '#475569', fontSize: '14px' }}>Dias Restantes</th>
                 <th style={{ padding: '12px', color: '#475569', fontSize: '14px' }}>Status</th>
                 <th style={{ padding: '12px', color: '#475569', fontSize: '14px' }}>Sugestão de Compra</th>
@@ -179,13 +180,17 @@ export default function App() {
                 <tr><td colSpan="6" style={{ padding: '16px', textAlign: 'center', color: '#64748b' }}>Nenhum produto cadastrado ainda.</td></tr>
               ) : (
                 predictions.map((p, index) => {
-                  const days = p.days_remaining ?? p.days_left ?? (p.daily_consumption ? Math.floor(p.current_stock / p.daily_consumption) : 0);
-                  const isCritical = p.status === 'CRÍTICO' || days <= 5;
+                  const stock = p.currentStock ?? p.current_stock ?? 0;
+                  const daily = p.dailyConsumption ?? 0;
+                  const days = p.daysRemaining ?? p.days_remaining ?? 0;
+                  const isCritical = p.status === 'CRÍTICO';
+                  const reorder = p.suggestedReorderQuantity ?? p.reorder_suggestion ?? 0;
+                  
                   return (
                     <tr key={index} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '12px', fontWeight: '600', color: '#1e293b' }}>{p.name || `Produto ${p.id}`}</td>
-                      <td style={{ padding: '12px', color: '#334155' }}>{p.current_stock ?? p.currentStock} un</td>
-                      <td style={{ padding: '12px', color: '#334155' }}>{p.daily_consumption ?? p.dailyConsumption ?? '-'} /dia</td>
+                      <td style={{ padding: '12px', fontWeight: '600', color: '#1e293b' }}>{p.name || `Produto ${p.productId || p.id}`}</td>
+                      <td style={{ padding: '12px', color: '#334155' }}>{stock} un</td>
+                      <td style={{ padding: '12px', color: '#334155' }}>{daily} /dia</td>
                       <td style={{ padding: '12px', fontWeight: 'bold', color: '#0f172a' }}>{days} dias</td>
                       <td style={{ padding: '12px' }}>
                         <span style={{
@@ -200,7 +205,7 @@ export default function App() {
                         </span>
                       </td>
                       <td style={{ padding: '12px', color: '#d97706', fontWeight: '600' }}>
-                        {p.reorder_suggestion > 0 ? `+${p.reorder_suggestion} un` : <span style={{ color: '#94a3b8' }}>Nenhuma</span>}
+                        {reorder > 0 ? `+${reorder} un` : <span style={{ color: '#94a3b8' }}>Nenhuma</span>}
                       </td>
                     </tr>
                   );
@@ -210,7 +215,7 @@ export default function App() {
           </table>
         </div>
 
-        {/* GRÁFICO */}
+        {/* CARD DO GRÁFICO */}
         <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0' }}>
           <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }}>
             📊 Autonomia de Estoque (Dias Restantes)
