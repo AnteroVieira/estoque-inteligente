@@ -24,7 +24,7 @@ ChartJS.register(
   Legend
 );
 
-const BASE_URL = "https://estoque-inteligente-xmd0.onrender.com/api";
+const API_PRODUCTS = "https://estoque-inteligente-xmd0.onrender.com/api/products";
 
 export default function App() {
   const [predictions, setPredictions] = useState([]);
@@ -36,18 +36,12 @@ export default function App() {
 
   const fetchPredictions = async () => {
     try {
-      // Tenta rota /predict ou fallback para /products
-      let res;
-      try {
-        res = await axios.get(`${BASE_URL}/predict`);
-      } catch (err) {
-        res = await axios.get(`${BASE_URL}/products`);
-      }
+      const res = await axios.get(API_PRODUCTS);
       if (Array.isArray(res.data)) {
         setPredictions(res.data);
       }
     } catch (error) {
-      console.error("Erro ao buscar dados:", error);
+      console.error("Erro ao carregar lista:", error);
     } finally {
       setLoading(false);
     }
@@ -59,31 +53,26 @@ export default function App() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Payload formatado para a rota /api/products
     const payload = {
       name: name,
+      currentStock: Number(currentStock),
+      dailyConsumption: Number(dailyConsumption),
       current_stock: Number(currentStock),
       daily_consumption: Number(dailyConsumption)
     };
 
     try {
-      // Tenta enviar para /predict
-      await axios.post(`${BASE_URL}/predict`, payload);
+      await axios.post(API_PRODUCTS, payload);
+
       setName('');
       setCurrentStock('');
       setDailyConsumption('');
       fetchPredictions();
     } catch (error) {
-      console.warn("Falha no /predict, tentando /products...", error);
-      try {
-        await axios.post(`${BASE_URL}/products`, payload);
-        setName('');
-        setCurrentStock('');
-        setDailyConsumption('');
-        fetchPredictions();
-      } catch (err2) {
-        console.error("Erro final ao salvar:", err2);
-        alert("Erro ao conectar com o backend no Render. Verifique se o servidor está ativo.");
-      }
+      console.error("Erro ao cadastrar produto:", error);
+      alert("Erro no servidor (Status 500). Verifique os logs do Render ou tente novamente.");
     }
   };
 
@@ -113,7 +102,7 @@ export default function App() {
 
       <main style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
         
-        {/* CARD DO FORMULÁRIO */}
+        {/* FORMULÁRIO */}
         <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0' }}>
           <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }}>
             ➕ Cadastrar Produto & Calcular Autonomia
@@ -170,7 +159,7 @@ export default function App() {
           </form>
         </div>
 
-        {/* CARD DA TABELA */}
+        {/* TABELA */}
         <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0', overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
@@ -190,13 +179,13 @@ export default function App() {
                 <tr><td colSpan="6" style={{ padding: '16px', textAlign: 'center', color: '#64748b' }}>Nenhum produto cadastrado ainda.</td></tr>
               ) : (
                 predictions.map((p, index) => {
-                  const days = p.days_remaining ?? p.days_left ?? 0;
+                  const days = p.days_remaining ?? p.days_left ?? (p.daily_consumption ? Math.floor(p.current_stock / p.daily_consumption) : 0);
                   const isCritical = p.status === 'CRÍTICO' || days <= 5;
                   return (
                     <tr key={index} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '12px', fontWeight: '600', color: '#1e293b' }}>{p.name || `Produto ${p.id}`}</td>
-                      <td style={{ padding: '12px', color: '#334155' }}>{p.current_stock} un</td>
-                      <td style={{ padding: '12px', color: '#334155' }}>{p.daily_consumption} /dia</td>
+                      <td style={{ padding: '12px', color: '#334155' }}>{p.current_stock ?? p.currentStock} un</td>
+                      <td style={{ padding: '12px', color: '#334155' }}>{p.daily_consumption ?? p.dailyConsumption ?? '-'} /dia</td>
                       <td style={{ padding: '12px', fontWeight: 'bold', color: '#0f172a' }}>{days} dias</td>
                       <td style={{ padding: '12px' }}>
                         <span style={{
@@ -221,7 +210,7 @@ export default function App() {
           </table>
         </div>
 
-        {/* CARD DO GRÁFICO */}
+        {/* GRÁFICO */}
         <div style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0' }}>
           <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px', color: '#1e293b' }}>
             📊 Autonomia de Estoque (Dias Restantes)
