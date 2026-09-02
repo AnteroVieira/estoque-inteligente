@@ -53,15 +53,12 @@ export default function App() {
     const stockNum = Number(currentStock);
     const dailyNum = Number(dailyConsumption);
 
-    // Envia o payload garantindo compatibility com SQLite e rotas do backend
+    // Envia min_stock baseado na venda diária inserida (7 dias de cobertura)
     const payload = {
       name: name,
       current_stock: stockNum,
-      min_stock: Math.ceil(dailyNum * 7), // Define min_stock baseado em 7 dias de consumo
-      lead_time_days: 7,
-      daily_consumption: dailyNum,
-      currentStock: stockNum,
-      dailyConsumption: dailyNum
+      min_stock: Math.ceil(dailyNum * 7),
+      lead_time_days: 7
     };
 
     try {
@@ -72,26 +69,32 @@ export default function App() {
       fetchPredictions();
     } catch (error) {
       console.error("Erro no cadastro:", error);
-      alert("Erro ao conectar ou salvar. Verifique o console com F12.");
+      alert("Erro ao cadastrar produto. Verifique a conexão com o servidor.");
     }
   };
 
-  // Configuração do Gráfico Horizontal (indexAxis: 'y')
+  const handleResetDatabase = async () => {
+    if (window.confirm("Deseja realmente apagar TODOS os produtos cadastrados e zerar a lista?")) {
+      try {
+        await axios.delete(`${API_BASE}/reset`);
+        alert("Todos os produtos antigos foram removidos com sucesso!");
+        fetchPredictions();
+      } catch (error) {
+        console.error("Erro ao zerar banco:", error);
+        alert("Erro ao zerar o banco de dados.");
+      }
+    }
+  };
+
   const chartData = {
     labels: predictions.map((p) => p.name || `Produto ${p.productId || p.id || ''}`),
     datasets: [
       {
         label: 'Dias Restantes',
-        data: predictions.map((p) => {
-          const stock = p.currentStock ?? p.current_stock ?? 0;
-          const daily = p.dailyConsumption ?? p.daily_consumption ?? 0.1;
-          return p.daysRemaining ?? p.days_remaining ?? (daily > 0 ? Math.floor(stock / daily) : 0);
-        }),
+        data: predictions.map((p) => p.daysRemaining ?? p.days_remaining ?? 0),
         backgroundColor: predictions.map((p) => {
-          const stock = p.currentStock ?? p.current_stock ?? 0;
-          const daily = p.dailyConsumption ?? p.daily_consumption ?? 0.1;
-          const days = p.daysRemaining ?? p.days_remaining ?? (daily > 0 ? Math.floor(stock / daily) : 0);
-          return days <= 5 ? '#dc2626' : '#2563eb';
+          const days = p.daysRemaining ?? p.days_remaining ?? 0;
+          return days <= 7 ? '#dc2626' : '#2563eb';
         }),
         borderRadius: 4,
         barThickness: 24,
@@ -100,7 +103,7 @@ export default function App() {
   };
 
   const chartOptions = {
-    indexAxis: 'y', // Deixa as barras na horizontal igual ao print
+    indexAxis: 'y',
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -136,7 +139,7 @@ export default function App() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                placeholder="Ex: Arroz 5kg"
+                placeholder="Ex: Cadeira gamer"
                 style={{ width: '100%', padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '14px', backgroundColor: '#ffffff', boxSizing: 'border-box' }}
               />
             </div>
@@ -183,11 +186,19 @@ export default function App() {
 
         {/* CARD DA TABELA */}
         <div style={{ backgroundColor: '#f8fafc', padding: '20px 24px', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-            <span style={{ width: '4px', height: '18px', backgroundColor: '#1d4ed8', borderRadius: '2px' }}></span>
-            <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: '#0f172a', margin: 0 }}>
-              📋 Visão Geral & Sugestão de Estoque
-            </h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ width: '4px', height: '18px', backgroundColor: '#1d4ed8', borderRadius: '2px' }}></span>
+              <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: '#0f172a', margin: 0 }}>
+                📋 Visão Geral & Sugestão de Estoque
+              </h2>
+            </div>
+            <button
+              onClick={handleResetDatabase}
+              style={{ backgroundColor: '#ef4444', color: '#ffffff', fontSize: '12px', fontWeight: 'bold', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }}
+            >
+              🗑️ Limpar Todos os Itens
+            </button>
           </div>
 
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -210,9 +221,9 @@ export default function App() {
                 predictions.map((p, index) => {
                   const stock = p.currentStock ?? p.current_stock ?? 0;
                   const daily = p.dailyConsumption ?? p.daily_consumption ?? 0;
-                  const days = p.daysRemaining ?? p.days_remaining ?? (daily > 0 ? Math.floor(stock / daily) : 0);
-                  const isCritical = p.status === 'CRÍTICO' || days <= 5;
-                  const reorder = p.suggestedReorderQuantity ?? p.reorder_suggestion ?? (isCritical ? Math.ceil(daily * 30) : 0);
+                  const days = p.daysRemaining ?? p.days_remaining ?? 0;
+                  const isCritical = p.status === 'CRÍTICO';
+                  const reorder = p.suggestedReorderQuantity ?? 0;
 
                   return (
                     <tr key={index} style={{ borderBottom: '1px solid #e2e8f0' }}>

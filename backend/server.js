@@ -74,7 +74,7 @@ app.post('/api/movements', async (req, res) => {
   res.json({ message: 'Movimentação registrada com sucesso.' });
 });
 
-// Rota 4: Algoritmo de Previsão de Falta de Estoque (Ajustado para novos produtos)
+// Rota 4: Algoritmo de Previsão de Falta de Estoque (Inteligência Preditiva)
 app.get('/api/predictions', async (req, res) => {
   const products = await db.all('SELECT * FROM products');
   const predictions = [];
@@ -92,7 +92,7 @@ app.get('/api/predictions', async (req, res) => {
     const totalOut = result?.total_out || 0;
     const calculatedDaily = totalOut / 30;
 
-    // Se houver vendas gravadas, usa o histórico. Se for produto novo, usa a estimativa (min_stock / 7)
+    // Se houver histórico de saídas, usa ele; se for produto recém-cadastrado, calcula via min_stock
     const dailyConsumption = calculatedDaily > 0 ? calculatedDaily : (product.min_stock / 7 || 1);
     
     const daysRemaining = Math.floor(product.current_stock / dailyConsumption);
@@ -102,7 +102,7 @@ app.get('/api/predictions', async (req, res) => {
       productId: product.id,
       name: product.name,
       currentStock: product.current_stock,
-      dailyConsumption: dailyConsumption.toFixed(2),
+      dailyConsumption: Number(dailyConsumption.toFixed(2)),
       daysRemaining,
       status: isCritical ? 'CRÍTICO' : 'OK',
       suggestedReorderQuantity: isCritical ? Math.ceil(dailyConsumption * 30) : 0
@@ -110,6 +110,17 @@ app.get('/api/predictions', async (req, res) => {
   }
 
   res.json(predictions);
+});
+
+// Rota 5: Limpar todos os produtos e zerar a tabela
+app.delete('/api/reset', async (req, res) => {
+  try {
+    await db.run('DELETE FROM stock_movements');
+    await db.run('DELETE FROM products');
+    res.json({ message: 'Banco de dados zerado com sucesso!' });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao zerar o banco de dados.' });
+  }
 });
 
 const PORT = 3001;
